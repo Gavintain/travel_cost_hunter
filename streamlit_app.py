@@ -3,8 +3,6 @@ import altair as alt
 import math
 import pandas as pd
 import streamlit as st
-from streamlit.report_thread import get_report_ctx
-import SessionState
 from time import sleep
 """
 # Welcome to Streamlit!
