@@ -14,52 +14,59 @@ import random
 # from pdpbox.pdp import pdp_isolate, pdp_plot
 import datetime
 from datetime import datetime, timedelta
-
+import sqlite3
 # Metabase 설정
 METABASE_URL = "https://teami5.metabaseapp.com/public/dashboard/20c55ded-717f-4edd-ad63-89af2654c8da"
 
-# ## 비행시간 출력 함수
-# def Flight_Time(Departure_or_entry,Class,Flight_type):
-#     # 비행 시간표
-#     departure = pd.DataFrame({'비즈니스': [11.335042016806725, 22.935111930471425, 25.619097639981486, 28.99587301587302, 51.64812499999999], 
-#              '이코노미': [11.215637583892619, 23.28843523073319, 25.919412673879446, 26.798203497615262, 51.6],
-#              '프리미엄 이코노미': [11.302, 23.054464520367937, 26.041043719989894, 26.864802784222736, 51], 
-#              '퍼스트': [11.169999999999995, 19.993137996219282, 24.588079999999998, 29.370550660792954, 51]}).round(2)
-#     entry = pd.DataFrame({'비즈니스': [13.326504065040652, 25.909293025470127, 28.1739769065521, 36.17582456140351, 54.69217391304348], 
-#          '이코노미': [13.261862068965517, 25.64626043841336, 28.733799201369084, 29.991457399103137, 56], 
-#          '프리미엄 이코노미': [13.166, 25.593388288800455, 28.34211437170805, 33.18008445945946, 81.385], 
-#          '퍼스트': [13.33435483870968, 24.71732824427481, 28.076642066420664, 31.87838331160365, 88.10833333333333]}).round(2)
-#     # 비행 시간 출력
-#     if Departure_or_entry == '출국':
-#         return departure[Class][Flight_type]
-#     elif Departure_or_entry == '귀국':
-#         return entry[Class][Flight_type]
+def create_connection():
+    conn = None
+    try:
+        conn = sqlite3.connect('db/sqlite_db.db')  # 데이터베이스 파일 경로를 입력
+        return conn
+    except sqlite3.Error as e:
+        print(e)
+    return conn
 
-# ## 날짜 데이터 처리
-# def Date_data(Date):
-#     dt = datetime(Date)
-#     day = dt.day
-#     # 월:0,화:1,수:2,목:3,금:4,토:5,일:6 /->전환/ '토':2, '금':1, '화':5, '수':6, '일':3, '월':4, '목':7
-#     week_list = {'0':'월','1':'화','2':'수','3':'목','4':'금','5':'토','6':'일'}
-#     week_code = {'토':2, '금':1, '화':5, '수':6, '일':3, '월':4, '목':7}
-#     wc = week_list[str(dt.weekday())]
-#     week = week_code[wc]
-#     hour = dt.hour
-#     return day, week, hour
+    
+def Flight_Time(Departure_or_entry,Class,Flight_type):
+    # 비행 시간표
+    departure = pd.DataFrame({'비즈니스': [11.335042016806725, 22.935111930471425, 25.619097639981486, 28.99587301587302, 51.64812499999999], 
+             '이코노미': [11.215637583892619, 23.28843523073319, 25.919412673879446, 26.798203497615262, 51.6],
+             '프리미엄 이코노미': [11.302, 23.054464520367937, 26.041043719989894, 26.864802784222736, 51], 
+             '퍼스트': [11.169999999999995, 19.993137996219282, 24.588079999999998, 29.370550660792954, 51]}).round(2)
+    entry = pd.DataFrame({'비즈니스': [13.326504065040652, 25.909293025470127, 28.1739769065521, 36.17582456140351, 54.69217391304348], 
+         '이코노미': [13.261862068965517, 25.64626043841336, 28.733799201369084, 29.991457399103137, 56], 
+         '프리미엄 이코노미': [13.166, 25.593388288800455, 28.34211437170805, 33.18008445945946, 81.385], 
+         '퍼스트': [13.33435483870968, 24.71732824427481, 28.076642066420664, 31.87838331160365, 88.10833333333333]}).round(2)
+    # 비행 시간 출력
+    if Departure_or_entry == '출국':
+        return departure[Class][Flight_type]
+    elif Departure_or_entry == '귀국':
+        return entry[Class][Flight_type]
 
-# ## 데이터 프레임형태로 만드는 함수
-# def Make_DataFrame(Departure_or_entry,Date):
-#     day, week, hour = Date_data(Date)
-#     Flight_time_hour = Flight_Time(Departure_or_entry,Class,Flight_type)
-#     return pd.DataFrame({'class': Class, 
-#                          'port_a': Port_a, 
-#                          'interior_airlines': Interior_airlines, 
-#                          'flight_type': Flight_type,
-#                          'flight_time_hour': Flight_time_hour, 
-#                          'port_d': Port_d,
-#                          'departure_hour': hour, 
-#                          'departure_date_day': day, 
-#                          'departure_day': week})
+def Date_data(Date):
+    dt = datetime(Date)
+    day = dt.day
+    # 월:0,화:1,수:2,목:3,금:4,토:5,일:6 /->전환/ '토':2, '금':1, '화':5, '수':6, '일':3, '월':4, '목':7
+    week_list = {'0':'월','1':'화','2':'수','3':'목','4':'금','5':'토','6':'일'}
+    week_code = {'토':2, '금':1, '화':5, '수':6, '일':3, '월':4, '목':7}
+    wc = week_list[str(dt.weekday())]
+    week = week_code[wc]
+    hour = dt.hour
+    return day, week, hour
+
+def Make_DataFrame(Departure_or_entry,Date):
+    day, week, hour = Date_data(Date)
+    Flight_time_hour = Flight_Time(Departure_or_entry,Class,Flight_type)
+    return pd.DataFrame({'class': Class, 
+                         'port_a': Port_a, 
+                         'interior_airlines': Interior_airlines, 
+                         'flight_type': Flight_type,
+                         'flight_time_hour': Flight_time_hour, 
+                         'port_d': Port_d,
+                         'departure_hour': hour, 
+                         'departure_date_day': day, 
+                         'departure_day': week})
 
 
 # # Metabase API 로그인
@@ -192,7 +199,8 @@ def main():
         
         st.write("원하시는 일정의 항공권에 대한 가격을 예측하고 싶다면 몇 가지 데이터를 입력해 주세요.")
         st.write("출국 항공권 가격 예측")
-        # 입력 데이터 (입력값 : 치환값)
+
+        # 입력 데이터 리스트 및 딕셔너리
         direction_list = ["한국->미국","미국->한국"]
         direction_dict = {"한국->미국":"출국","미국->한국":"입국"}
         airlines_list = ['국내 항공사','국외 항공사']
@@ -203,36 +211,36 @@ def main():
         airport_dict = {"인천국제공항(ICN)":1,"김포공항(GMP)":2,"로스엔젤레스국제공항(LAX)":3,"할리우드버뱅크공항(BUR)":4}
         flight_type_list = ['직항','경유 1회', '경유 2회','경유 3회','경유 4회']
         flight_type_dict = {'직항':0,'경유 1회':1, '경유 2회':2,'경유 3회':3,'경유 4회':4}
-        # ## 출국 데이터 입력
-        # Departure_or_entry = '출국' #비행기 방향(KA->LA 출국)
-        # Class = input() #클래스 선택( 이코노미 : 1 / 비즈니스 : 2 / 프리미엄 이코노미 : 3 / 퍼스트 : 4 )
-        # Port_d = input() #탑승 공항( K->L : ICN = 1 / GMP = 2 | L->K LAX = 1 / BUR = 2 )
-        # Date = input() #날짜(-> departure_day 요일/departure_date_day 일/ departure_hour 시간/ departure_minute 분 으로 데이터가 나누어짐)
-        # Port_a = input() #하차 공항( K->L : LAX = 1 / BUR = 2 | L->K GMP = 1 / ICN = 2 )
-        # Interior_airlines = input() #국내 항공 선택(국내항공 선택 : 1 / 국내항공 선택 안함 : 0)
-        # Flight_type = input() #직항 경유 선택 여부(직항 : 0 / 경유 회수 : 1, 2, 3, 4)
-        # departure_df = Make_DataFrame(Departure_or_entry,Date)
-        direction = st.selectbox("항공권 방향을 고르세요", direction_list)
+
+         # ## 출국 데이터 입력
+       
+        depart_direction = st.selectbox("항공권 방향을 고르세요", direction_list)
         departure_date = st.date_input("출발 날짜를 고르세요. (23년도 9월만 예측 가능)")
         if departure_date.year != 23 and departure_date.month != 9:
             st.write("<span class='warning-text'>23년도 9월만 서비스 가능합니다. 날짜를 확인해주세요.</span>",unsafe_allow_html=True)
         departure_time = st.time_input("출발 시각을 고르거나 입력하세요")
-        dclass = st.selectbox("좌석 클래스를 고르세요", class_list)
-        departure_airport = st.selectbox("출발 공항을 고르세요", airport_list)
-        arrival_airport = st.selectbox("도착 공항을 고르세요",airport_list)
-        flight_type = st.selectbox("항공권 경유 횟수를 고르세요",flight_type_list)
+        depart_class = st.selectbox("좌석 클래스를 고르세요", class_list)
+        depart_departure_airport = st.selectbox("출발 공항을 고르세요", airport_list)
+        depart_arrival_airport = st.selectbox("도착 공항을 고르세요",airport_list)
+        depart_flight_type = st.selectbox("항공권 경유 횟수를 고르세요",flight_type_list)
 
         # departure_df = Make_DataFrame(Departure_or_entry,Date)
 
+        st.write("항공권 가격은 [] 로 예측됩니다.")
 
-        # ## 귀국 데이터 입력
-        # Departure_or_entry = '귀국' #비행기 방향(LA->KA 입국)
-        # Class = input() #클래스 선택( 이코노미 : 1 / 비즈니스 : 2 / 프리미엄 이코노미 : 3 / 퍼스트 : 4 )
-        # Port_d = input() #탑승 공항( K->L : ICN = 1 / GMP = 2 | L->K LAX = 1 / BUR = 2 )
-        # Date = input() #날짜(-> departure_day 요일/departure_date_day 일/ departure_hour 시간/ departure_minute 분 으로 데이터가 나누어짐)
-        # Port_a = input() #하차 공항( K->L : LAX = 1 / BUR = 2 | L->K GMP = 1 / ICN = 2 )
-        # Interior_airlines = input() #국내 항공 선택(국내항공 선택 : 1 / 국내항공 선택 안함 : 0)
-        # Flight_type = input() #직항 경유 선택 여부(직항 : 0 / 경유 회수 : 1, 2, 3, 4)
+        
+        # # ## 귀국 데이터 입력
+        # st.write("\n귀국 항공권 가격 예측")
+        # return_direction = st.selectbox("항공권 방향을 고르세요", direction_list)
+        # return_date = st.date_input("출발 날짜를 고르세요. (23년도 9월만 예측 가능)")
+        # if return_date.year != 23 and return_date.month != 9:
+        #     st.write("<span class='warning-text'>23년도 9월만 서비스 가능합니다. 날짜를 확인해주세요.</span>",unsafe_allow_html=True)
+        # return_time = st.time_input("도착 시각을 고르거나 입력하세요")
+        # return_class = st.selectbox("좌석 클래스를 고르세요", class_list)
+        # return_departure_airport = st.selectbox("출발 공항을 고르세요", airport_list)
+        # return_arrival_airport = st.selectbox("도착 공항을 고르세요",airport_list)
+        # return_flight_type = st.selectbox("항공권 경유 횟수를 고르세요",flight_type_list)
+
         # entry_df = Make_DataFrame(Departure_or_entry,Date)
 
         # # 출국(KA -> LA)
@@ -250,6 +258,64 @@ def main():
         # print('출국 티켓값 : ',int(departure_pred))
         # print('입국 티켓값 : ',int(entry_pred))
         # print('총 티켓값 : ', int(Price))
+
+        st.write("\n숙소 가격 검색")
+
+        col1,col2,col3,col4 = st.columns(4)
+        # 입력값
+        def get_user_input(conn):
+            locations_query= "SELECT DISTINCT location FROM accommodation;"
+            locations = pd.read_sql_query(locations_query,conn)['location'].tolist()
+            
+            with col1:
+                check_in_day = st.date_input('체크인 날짜를 선택하세요.')
+            with col2:
+                location = st.selectbox('숙소 지역을 선택하세요.',locations)
+            with col3:
+                score = st.slider('최소 평점을 선택하세요.', 5.0, 10.0)
+            if check_in_day.year != 23 and check_in_day.month != 9:
+                st.write("<span class='warning-text'>23년도 9월만 서비스 가능합니다. 날짜를 확인해주세요.</span>",unsafe_allow_html=True)
+            return check_in_day, location, score
+
+        # 쿼리를 실행하는 함수
+        def run_query(conn, check_in_day, location, score):
+            query = f'''
+                SELECT Name, price
+                FROM accommodation
+                WHERE check_in_day = '{check_in_day}' AND location = '{location}' AND score >= {score}
+                ORDER BY price ASC
+                LIMIT 5;
+            '''
+            result = pd.read_sql_query(query, conn)
+            with col4:
+                return result
+
+        # 쿼리를 실행하는 함수
+        def run_query(conn, check_in_day, location, score):
+            query = f'''
+                SELECT Name, price
+                FROM Accommodation
+                WHERE check_in_day = '{check_in_day}' AND location = '{location}' AND score >= {score}
+                ORDER BY price ASC
+                LIMIT 5;
+            '''
+            result = pd.read_sql_query(query, conn)
+            with col4:
+                return result
+
+        conn = create_connection()
+        if conn is None:
+            st.error('데이터베이스 연결에 실패했습니다.')
+            return
+        
+        check_in_day, location, score = get_user_input(conn)
+        
+        if st.button('검색'):
+            if not check_in_day or not location:
+                st.warning('날짜와 지역을 입력해주세요.')
+            else:
+                result = run_query(conn, check_in_day, location,score)
+                st.table(result)
 
 
         st.caption('\n\nTeam I5 ')
