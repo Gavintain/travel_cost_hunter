@@ -68,35 +68,6 @@ def Make_DataFrame(Departure_or_entry,Date):
                          'departure_date_day': day, 
                          'departure_day': week})
 
-
-# # Metabase API 로그인
-# def metabase_login():
-#     url = f"{METABASE_URL}/api/session"
-#     data = {
-#         "username": METABASE_USERNAME,
-#         "password": METABASE_PASSWORD
-#     }
-#     response = requests.post(url, json=data)
-#     response_json = response.json()
-#     if "id" in response_json:
-#         return response_json["id"]
-#     else:
-#         raise ValueError("Failed to log in to Metabase API. Check your credentials and URL.")
-
-# # 대시보드 데이터 가져오기
-# def get_dashboard_data():
-#     try:
-#         session_id = metabase_login()
-#         url = f"{METABASE_URL}/api/dashboard/{DASHBOARD_ID}/query"
-#         headers = {
-#             "X-Metabase-Session": session_id
-#         }
-#         response = requests.get(url, headers=headers)
-#         return response.json()
-#     except Exception as e:
-#         st.error(f"Error occurred while fetching dashboard data: {e}")
-
-
 def main():
     # 사이드바 스타일을 적용하기 위한 CSS 스타일
     st.markdown(
@@ -166,8 +137,14 @@ def main():
     # 타이틀 표시
     st.markdown("<h1 class='title'>Travel Cost Hunter</h1>", unsafe_allow_html=True)
 
+
     # 사이드바에서 페이지 선택
+    
     selected_page = st.sidebar.selectbox("Menu", ["Home", "Travel Cost Prediction", "DashBoard"])
+
+    depart_cost=0
+    return_cost=0
+    accom_cost=0
 
     # 각 페이지의 내용을 표시
     if selected_page == "Home":
@@ -196,68 +173,128 @@ def main():
         st.caption('\n\nTeam I5 ')
 
     elif selected_page == "Travel Cost Prediction":
-        
-        st.write("원하시는 일정의 항공권에 대한 가격을 예측하고 싶다면 몇 가지 데이터를 입력해 주세요.")
-        st.write("출국 항공권 가격 예측")
 
-        # 입력 데이터 리스트 및 딕셔너리
-        direction_list = ["한국->미국","미국->한국"]
-        direction_dict = {"한국->미국":"출국","미국->한국":"입국"}
+        st.write("Travel Cost Hunter는 출국 항공권,귀국 항공권 그리고 숙박권을 바탕으로 총 여행 경비를 예측합니다. 출국 항공권,귀국 항공권 그리고 숙박권에 대한 몇 가지 데이터를 입력해주시면 예측해드리겠습니다!")
+         # 입력 데이터 (입력값 : 치환값)
+
+        # 출국 날짜
+        departure_date = st.date_input("출발 날짜를 고르세요.")
+        departure_time = st.time_input("출발 시각을 고르거나 입력하세요")
+
+        departure = str(departure_date)+" "+str(departure_time)
+        departure = pd.to_datetime(departure)
+        st.write(departure)
+
+        # 국내 항공사 선택
         airlines_list = ['국내 항공사','국외 항공사']
         airlines_dict = {'국내 항공사':1,'국외 항공사':0}
+        dIa = st.selectbox("국내 항공사를 꼭 사용하겠습니까?", airlines_list)
+        departure_Interior_airlines = airlines_dict[dIa]
+
+        # class 설정
         class_list = ["이코노미", "비지니스", "프리미엄 이코노미", "퍼스트"]
-        class_dict = {"이코노미":1, "비지니스":2, "프리미엄 이코노미":3, "퍼스트":4}
-        airport_list = ["인천국제공항(ICN)","김포공항(GMP)","로스엔젤레스국제공항(LAX)","할리우드버뱅크공항(BUR)"]
+        class_dict = {"이코노미": 1, "비지니스": 2, "프리미엄 이코노미": 3, "퍼스트": 4}
+        dclass = st.selectbox("좌석 클래스를 고르세요", class_list)
+        departure_CLASS = class_dict[dclass]
+        
+        # 탑승 공항 선택
+        port_d_list = ["인천국제공항(ICN)","김포공항(GMP)"]
+        port_a_list = ["로스엔젤레스국제공항(LAX)","할리우드버뱅크공항(BUR)"]
         airport_dict = {"인천국제공항(ICN)":1,"김포공항(GMP)":2,"로스엔젤레스국제공항(LAX)":3,"할리우드버뱅크공항(BUR)":4}
+        departure_airport = st.selectbox("출발 공항을 고르세요", port_d_list)
+        departure_Port_d = airport_dict[departure_airport]
+        arrival_airport = st.selectbox("도착 공항을 고르세요",port_a_list)
+        departure_Port_a = airport_dict[arrival_airport]
+        
+        # 경유 여부
         flight_type_list = ['직항','경유 1회', '경유 2회','경유 3회','경유 4회']
         flight_type_dict = {'직항':0,'경유 1회':1, '경유 2회':2,'경유 3회':3,'경유 4회':4}
-
-         # ## 출국 데이터 입력
-       
-        depart_direction = st.selectbox("항공권 방향을 고르세요", direction_list)
-        departure_date = st.date_input("출발 날짜를 고르세요. (23년도 9월만 예측 가능)")
-        if departure_date.year != 23 and departure_date.month != 9:
-            st.write("<span class='warning-text'>23년도 9월만 서비스 가능합니다. 날짜를 확인해주세요.</span>",unsafe_allow_html=True)
-        departure_time = st.time_input("출발 시각을 고르거나 입력하세요")
-        depart_class = st.selectbox("좌석 클래스를 고르세요", class_list)
-        depart_departure_airport = st.selectbox("출발 공항을 고르세요", airport_list)
-        depart_arrival_airport = st.selectbox("도착 공항을 고르세요",airport_list)
-        depart_flight_type = st.selectbox("항공권 경유 횟수를 고르세요",flight_type_list)
-
-        # departure_df = Make_DataFrame(Departure_or_entry,Date)
-
-        st.write("항공권 가격은 [] 로 예측됩니다.")
-
+        flight_type = st.selectbox("항공권 경유 횟수를 고르세요",flight_type_list)
+        departure_Flight_type = flight_type_dict[flight_type]
         
-        # # ## 귀국 데이터 입력
-        # st.write("\n귀국 항공권 가격 예측")
-        # return_direction = st.selectbox("항공권 방향을 고르세요", direction_list)
-        # return_date = st.date_input("출발 날짜를 고르세요. (23년도 9월만 예측 가능)")
-        # if return_date.year != 23 and return_date.month != 9:
-        #     st.write("<span class='warning-text'>23년도 9월만 서비스 가능합니다. 날짜를 확인해주세요.</span>",unsafe_allow_html=True)
-        # return_time = st.time_input("도착 시각을 고르거나 입력하세요")
-        # return_class = st.selectbox("좌석 클래스를 고르세요", class_list)
-        # return_departure_airport = st.selectbox("출발 공항을 고르세요", airport_list)
-        # return_arrival_airport = st.selectbox("도착 공항을 고르세요",airport_list)
-        # return_flight_type = st.selectbox("항공권 경유 횟수를 고르세요",flight_type_list)
+        # 자동 설정
+        departure = pd.DataFrame({'이코노미': [11.215637583892619, 23.28843523073319, 25.919412673879446, 26.798203497615262, 51.6],
+                    '비즈니스': [11.335042016806725, 22.935111930471425, 25.619097639981486, 28.99587301587302, 51.64812499999999],
+                    '프리미엄 이코노미': [11.302, 23.054464520367937, 26.041043719989894, 26.864802784222736, 51], 
+                    '퍼스트': [11.169999999999995, 19.993137996219282, 24.588079999999998, 29.370550660792954, 51]})
+        departure_Flight_time_hour = round(departure[dclass][departure_Flight_type],2)
 
-        # entry_df = Make_DataFrame(Departure_or_entry,Date)
+        #week_encoding = {'월':0,'화':1,'수':2,'목':3,'금':4,'토':5,'일':6}
+        st.header('귀국일')
+        # 귀국 날짜
+        homecoming_date = st.date_input("귀국 날짜를 고르세요.")
+        if departure_date == homecoming_date:
+            st.write("<span class='warning-text'>출국일과 귀국일이 동일합니다.</span>",unsafe_allow_html=True)
+        if departure_date > homecoming_date:
+            st.write("<span class='warning-text'>오류:출국일 보다 과거의 시간입니다.</span>",unsafe_allow_html=True)
+        homecoming_time = st.time_input("출발 시각을 고르거나 입력하세요", key="unique_key_for_homecoming_time")
+        
+        # homecoming = str(homecoming_date)+" "+str(homecoming_time)
+        # homecoming = pd.to_datetime(homecoming)
+        # st.write(homecoming)
 
-        # # 출국(KA -> LA)
-        # with open('departure.pkl','rb') as pickle_file:
-        #     model_departure = pickle.load(pickle_file)
-        # departure_pred = model_departure.predict(departure_df)[0]
+        # 국내 항공사
+        dIa2 = st.selectbox("국내 항공사를 꼭 사용하겠습니까?", airlines_list, key="unique_key_for_dIa2")
+        homecoming_Interior_airlines = airlines_dict[dIa2]
 
-        # # 귀국(LA -> KA)
-        # with open('entry.pkl','rb') as pickle_file:
-        #     model_entry = pickle.load(pickle_file)
-        # entry_pred = model_departure.predict(entry_df)[0]
+        # 클래스 설정
+        dclass2 = st.selectbox("좌석 클래스를 고르세요", class_list, key="unique_key_for_dclass2")
+        homecoming_CLASS = class_dict[dclass2]
 
-        # # 티켓 완복 가격
-        # Price = round(departure_pred + entry_pred,0)
-        # print('출국 티켓값 : ',int(departure_pred))
-        # print('입국 티켓값 : ',int(entry_pred))
-        # print('총 티켓값 : ', int(Price))
+        # 경유 여부
+        flight_type2 = st.selectbox("항공권 경유 횟수를 고르세요",flight_type_list, key="unique_key_for_flight_type2")
+        homecoming_Flight_type = flight_type_dict[flight_type2]
+
+        # 자동 설정
+        # 탑승 공항 -> 기존에 선택한 공항의 반대로 자동으로 선택
+        homecoming_Port_d = airport_dict[arrival_airport]
+        homecoming_Port_a = airport_dict[departure_airport]
+
+        entry = pd.DataFrame({'비즈니스': [13.326504065040652, 25.909293025470127, 28.1739769065521, 36.17582456140351, 54.69217391304348], 
+         '이코노미': [13.261862068965517, 25.64626043841336, 28.733799201369084, 29.991457399103137, 56], 
+         '프리미엄 이코노미': [13.166, 25.593388288800455, 28.34211437170805, 33.18008445945946, 81.385], 
+         '퍼스트': [13.33435483870968, 24.71732824427481, 28.076642066420664, 31.87838331160365, 88.10833333333333]})
+        homecoming_Flight_time_hour = round(entry[dclass2][homecoming_Flight_type],2)
+
+        # test = homecoming_date + homecoming_time
+        # st.write(f'{test}')
+        st.write(f'{type(str(homecoming_date))}')
+        st.write(f'{str(homecoming_date)+" "+str(homecoming_time)}')
+
+        if st.button("선택 완료"):
+            df_homecoming = pd.DataFrame({'departure_date': homecoming_date.day,
+                            'departure_week':homecoming_date.weekday(),
+                            'departure_time': homecoming_time.hour, 
+                            'class': homecoming_CLASS,
+                            'flight_type': homecoming_Flight_type,
+                            'flight_time_hour': homecoming_Flight_time_hour, 
+                            'port_d':homecoming_Port_d, 
+                            'port_a':homecoming_Port_a, 
+                            'interior_airlines': homecoming_Interior_airlines}, index=[0])
+            
+            df_departure = pd.DataFrame({'departure_date': departure_date.day,
+                            'departure_week':departure_date.weekday(),
+                            'departure_time': departure_time.hour, 
+                            'class': departure_CLASS,
+                            'flight_type': departure_Flight_type,
+                            'flight_time_hour': departure_Flight_time_hour, 
+                            'port_d':departure_Port_d, 
+                            'port_a':departure_Port_a, 
+                            'interior_airlines': departure_Interior_airlines}, index=[0])
+            
+            with open('last_model.pkl','rb') as pickle_file:
+                model_departure = pickle.load(pickle_file)
+            departure_pred = model_departure.predict(df_departure)[0]
+            homecoming_pred = model_departure.predict(df_homecoming)[0]
+            departure_result = format(int(departure_pred), ',d')
+            homecoming_result = format(int(homecoming_pred), ',d')
+            result = format(int(departure_pred+homecoming_pred), ',d')
+            st.table(df_departure)
+            st.table(df_homecoming)
+            st.write(f'{departure_result}원')
+            st.write(f'{homecoming_result}원')
+            st.write(f'{result}원')
+        
 
         st.write("\n숙소 가격 검색")
 
@@ -317,8 +354,9 @@ def main():
                 result = run_query(conn, check_in_day, location,score)
                 st.table(result)
 
-
         st.caption('\n\nTeam I5 ')
+
+                
 
 if __name__ == "__main__":
     main()
