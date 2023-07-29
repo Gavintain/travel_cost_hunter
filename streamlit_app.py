@@ -27,6 +27,34 @@ def create_connection():
         print(e)
     return conn
 
+### ===================== 수정한 부분 시작 ===================== ###
+# check in 날짜 반환
+def check_in(d_time, travel_class, flight_type):
+    check_in_hour = {
+        '이코노미': [-4.78, 7.29, 9.92, 10.80, 35.60],
+        '비즈니스': [-4.66, 6.94, 9.62, 13.00, 35.65],
+        '프리미엄 이코노미': [-4.70, 7.05, 10.04, 10.86, 35.00],
+        '퍼스트': [-4.83, 3.99, 8.59, 13.37, 35.00]
+    }
+
+    def calculate_check_in_time(dt, t_class, f_type):
+        hour_offset = check_in_hour[t_class][f_type]
+        dt += timedelta(hours=hour_offset)
+        if dt.hour >= 24:
+            dt += timedelta(days=1)
+            dt = dt.replace(hour=dt.hour % 24)
+        return dt
+
+    return calculate_check_in_time(d_time, travel_class, flight_type)
+
+# check in 날짜로 부터 ckech out 날짜 계산
+def travel_duration(check_in, h_date):
+    travel_duration = h_date - check_in
+    return travel_duration.days
+### ===================== 수정한 부분 끝 ===================== ###
+
+
+
 def main():
     # 사이드바 스타일을 적용하기 위한 CSS 스타일
     st.markdown(
@@ -89,6 +117,18 @@ def main():
             height: 800px;
             border: none;
         }
+        .centered-btn {
+        display: flex;
+        justify-content: center;
+        }
+        .lefted-btn {
+        display: flex;
+        justify-content: left;
+        }
+        .righted-btn {
+        display: flex;
+        justify-content: right;
+        }
     </style>
     """
     st.markdown(page_style, unsafe_allow_html=True)
@@ -131,10 +171,12 @@ def main():
         if predict_process_page == "시작페이지":
             st.write("Travel Cost Hunter는 출국 항공권,귀국 항공권 그리고 숙박권을 바탕으로 총 여행 경비를 예측합니다. 출국 항공권,귀국 항공권 그리고 숙박권에 대한 몇 가지 데이터를 입력해주시면 예측해드리겠습니다!")
             st.caption('\n\nTeam I5 ')
-            if st.button("시작하기"):
-                # 입력 받은 데이터를 세션 상태에 저장하고 페이지 전환
-                st.session_state.predict_process_page = "출국항공권"
-                st.experimental_rerun()
+            col1, col2, col3 = st.columns([0.31, 0.33, 0.1])
+            with col2:
+                if st.button("시작하기"):
+                    # 입력 받은 데이터를 세션 상태에 저장하고 페이지 전환
+                    st.session_state.predict_process_page = "출국항공권"
+                    st.experimental_rerun()
 
         elif predict_process_page == "출국항공권":
             
@@ -144,9 +186,12 @@ def main():
             departure_date = st.date_input("출발 날짜를 고르세요.")
             departure_time = st.time_input("출발 시각을 고르거나 입력하세요")
 
+            ### ===================== 수정한 부분 시작 ===================== ###
+            d_date = datetime.combine(departure_date, departure_time)
+            st.session_state['d_date'] = d_date
+            ### ===================== 수정한 부분 끝 ===================== ###
             departure = str(departure_date)+" "+str(departure_time)
             departure = pd.to_datetime(departure)
-            st.write(departure)
 
             # 국내 항공사 선택
             airlines_list = ['국내 항공사','국외 항공사']
@@ -176,40 +221,50 @@ def main():
             departure_Flight_type = flight_type_dict[flight_type]
             
             st.caption('\n\nTeam I5 ')
-            if st.button("귀국항공권 선택으로 넘어가기"):
-                # 자동 설정
-                departure = pd.DataFrame({'이코노미': [11.215637583892619, 23.28843523073319, 25.919412673879446, 26.798203497615262, 51.6],
-                            '비즈니스': [11.335042016806725, 22.935111930471425, 25.619097639981486, 28.99587301587302, 51.64812499999999],
-                            '프리미엄 이코노미': [11.302, 23.054464520367937, 26.041043719989894, 26.864802784222736, 51], 
-                            '퍼스트': [11.169999999999995, 19.993137996219282, 24.588079999999998, 29.370550660792954, 51]})
-                departure_Flight_time_hour = round(departure[dclass][departure_Flight_type],2)
+            col1, col2, col3 = st.columns([0.28, 0.2, 0.18])
+            with col1:
+                if st.button("처음으로", key="Travel Cost Prediction return to startpage1"):
+                    st.session_state.predict_process_page = "시작페이지"
+                    st.experimental_rerun()
+            with col2:
+                pass
+            with col3:
+                if st.button("귀국 항공권 선택하기", key="Travel Cost Prediction from depart ticket to return ticket"):
+                    # 자동 설정
+                    departure = pd.DataFrame({'이코노미': [11.215637583892619, 23.28843523073319, 25.919412673879446, 26.798203497615262, 51.6],
+                                '비즈니스': [11.335042016806725, 22.935111930471425, 25.619097639981486, 28.99587301587302, 51.64812499999999],
+                                '프리미엄 이코노미': [11.302, 23.054464520367937, 26.041043719989894, 26.864802784222736, 51], 
+                                '퍼스트': [11.169999999999995, 19.993137996219282, 24.588079999999998, 29.370550660792954, 51]})
+                    departure_Flight_time_hour = round(departure[dclass][departure_Flight_type],2)
 
-                df_departure = pd.DataFrame({'departure_date': departure_date.day,
-                                'departure_week':departure_date.weekday(),
-                                'departure_time': departure_time.hour, 
-                                'class': departure_CLASS,
-                                'flight_type': departure_Flight_type,
-                                'flight_time_hour': departure_Flight_time_hour, 
-                                'port_d':departure_Port_d, 
-                                'port_a':departure_Port_a, 
-                                'interior_airlines': departure_Interior_airlines}, index=[0])
-                
-                with open('last_model.pkl','rb') as pickle_file:
-                    model_departure = pickle.load(pickle_file)
-                departure_pred = model_departure.predict(df_departure)[0]
-                departure_result = format(int(departure_pred), ',d')
-                # 입력 받은 데이터를 세션 상태에 저장하고 페이지 전환
-                
-                st.session_state['df_departure'] = df_departure
-                st.session_state['departure_result'] = departure_result
-                st.session_state['departure_pred'] = departure_pred
-                st.session_state['departure_date'] = departure_date
-                st.session_state['arrival_airport'] = arrival_airport
-                st.session_state['departure_airport'] = departure_airport
-                st.session_state.predict_process_page = "귀국항공권"
-                st.experimental_rerun()
+                    df_departure = pd.DataFrame({'departure_date': departure_date.day,
+                                    'departure_week':departure_date.weekday(),
+                                    'departure_time': departure_time.hour, 
+                                    'class': departure_CLASS,
+                                    'flight_type': departure_Flight_type,
+                                    'flight_time_hour': departure_Flight_time_hour, 
+                                    'port_d':departure_Port_d, 
+                                    'port_a':departure_Port_a, 
+                                    'interior_airlines': departure_Interior_airlines}, index=[0])
+                    
+                    with open('last_model.pkl','rb') as pickle_file:
+                        model_departure = pickle.load(pickle_file)
+                    departure_pred = model_departure.predict(df_departure)[0]
+                    departure_result = format(int(departure_pred), ',d')
+                    # 입력 받은 데이터를 세션 상태에 저장하고 페이지 전환
+                    
+                    st.session_state['df_departure'] = df_departure
+                    st.session_state['departure_result'] = departure_result
+                    st.session_state['departure_pred'] = departure_pred
+                    st.session_state['departure_date'] = departure_date
+                    st.session_state['arrival_airport'] = arrival_airport
+                    st.session_state['departure_airport'] = departure_airport
+                    st.session_state['dclass'] = dclass
+                    st.session_state['departure_Flight_type'] = departure_Flight_type
+                    st.session_state.predict_process_page = "귀국항공권"
+                    st.experimental_rerun()
+            
 
-            #week_encoding = {'월':0,'화':1,'수':2,'목':3,'금':4,'토':5,'일':6}
         elif predict_process_page == "귀국항공권":
             
             st.header('귀국 항공권')
@@ -224,18 +279,21 @@ def main():
             flight_type_dict = {'직항':0,'경유 1회':1, '경유 2회':2,'경유 3회':3,'경유 4회':4}
 
             # 귀국 날짜
-            homecoming_date = st.date_input("귀국 날짜를 고르세요.")
             departure_date = st.session_state['departure_date']
+            ### ===================== 수정한 부분 시작 ===================== ###
+            st.subheader(f"출국일 : {departure_date}")
+            ### ===================== 수정한 부분 끝 ===================== ###
+            homecoming_date = st.date_input("귀국 날짜를 고르세요.")
             if departure_date == homecoming_date:
                 st.write("<span class='warning-text'>출국일과 귀국일이 동일합니다.</span>",unsafe_allow_html=True)
             if departure_date > homecoming_date:
                 st.write("<span class='warning-text'>오류:출국일 보다 과거의 시간입니다.</span>",unsafe_allow_html=True)
             homecoming_time = st.time_input("출발 시각을 고르거나 입력하세요", key="unique_key_for_homecoming_time")
             
-            # homecoming = str(homecoming_date)+" "+str(homecoming_time)
-            # homecoming = pd.to_datetime(homecoming)
-            # st.write(homecoming)
-
+            ### ===================== 수정한 부분 시작 ===================== ###
+            h_date = datetime.combine(homecoming_date, homecoming_time)
+            st.session_state['h_date'] = h_date
+            ### ===================== 수정한 부분 킅 ===================== ###
             # 국내 항공사
             dIa2 = st.selectbox("국내 항공사를 꼭 사용하겠습니까?", airlines_list, key="unique_key_for_dIa2")
             homecoming_Interior_airlines = airlines_dict[dIa2]
@@ -249,44 +307,54 @@ def main():
             homecoming_Flight_type = flight_type_dict[flight_type2]
 
             st.caption('\n\nTeam I5 ')
-            if st.button("숙박권 선택으로 넘어가기"):
-                # 자동 설정
-                # 탑승 공항 -> 기존에 선택한 공항의 반대로 자동으로 선택
-                arrival_airport = st.session_state['arrival_airport']
-                departure_airport = st.session_state['departure_airport']
-                homecoming_Port_d = airport_dict[arrival_airport]
-                homecoming_Port_a = airport_dict[departure_airport]
+            col1, col2, col3 = st.columns([0.28, 0.2, 0.14])
 
-                entry = pd.DataFrame({'비즈니스': [13.326504065040652, 25.909293025470127, 28.1739769065521, 36.17582456140351, 54.69217391304348], 
-                '이코노미': [13.261862068965517, 25.64626043841336, 28.733799201369084, 29.991457399103137, 56], 
-                '프리미엄 이코노미': [13.166, 25.593388288800455, 28.34211437170805, 33.18008445945946, 81.385], 
-                '퍼스트': [13.33435483870968, 24.71732824427481, 28.076642066420664, 31.87838331160365, 88.10833333333333]})
-                homecoming_Flight_time_hour = round(entry[dclass2][homecoming_Flight_type],2)
+            with col1:
+                if st.button("출국 항공권 선택으로 돌아가기", key="Travel Cost Prediction from return ticket to depart ticket"):
+                    st.session_state.predict_process_page = "출국항공권"
+                    st.experimental_rerun()
+            with col3:
+                if st.button("숙박권 선택으로", key="Travel Cost Prediction from return ticket to accomoation ticket"):
+                    # 자동 설정
+                    # 탑승 공항 -> 기존에 선택한 공항의 반대로 자동으로 선택
+                    arrival_airport = st.session_state['arrival_airport']
+                    departure_airport = st.session_state['departure_airport']
+                    homecoming_Port_d = airport_dict[arrival_airport]
+                    homecoming_Port_a = airport_dict[departure_airport]
 
-                df_homecoming = pd.DataFrame({'departure_date': homecoming_date.day,
-                                'departure_week':homecoming_date.weekday(),
-                                'departure_time': homecoming_time.hour, 
-                                'class': homecoming_CLASS,
-                                'flight_type': homecoming_Flight_type,
-                                'flight_time_hour': homecoming_Flight_time_hour, 
-                                'port_d':homecoming_Port_d, 
-                                'port_a':homecoming_Port_a, 
-                                'interior_airlines': homecoming_Interior_airlines}, index=[0])
-                
-                with open('last_model.pkl','rb') as pickle_file:
-                    model_departure = pickle.load(pickle_file)
-                homecoming_pred = model_departure.predict(df_homecoming)[0]     
-                homecoming_result = format(int(homecoming_pred), ',d')
+                    entry = pd.DataFrame({'비즈니스': [13.326504065040652, 25.909293025470127, 28.1739769065521, 36.17582456140351, 54.69217391304348], 
+                    '이코노미': [13.261862068965517, 25.64626043841336, 28.733799201369084, 29.991457399103137, 56], 
+                    '프리미엄 이코노미': [13.166, 25.593388288800455, 28.34211437170805, 33.18008445945946, 81.385], 
+                    '퍼스트': [13.33435483870968, 24.71732824427481, 28.076642066420664, 31.87838331160365, 88.10833333333333]})
+                    homecoming_Flight_time_hour = round(entry[dclass2][homecoming_Flight_type],2)
 
-                st.session_state['homecoming_pred'] = homecoming_pred
-                st.session_state['df_homecoming'] = df_homecoming
-                st.session_state['homecoming_result'] = homecoming_result
-                st.session_state.predict_process_page = "숙박권"
-                st.experimental_rerun()
+                    df_homecoming = pd.DataFrame({'departure_date': homecoming_date.day,
+                                    'departure_week':homecoming_date.weekday(),
+                                    'departure_time': homecoming_time.hour, 
+                                    'class': homecoming_CLASS,
+                                    'flight_type': homecoming_Flight_type,
+                                    'flight_time_hour': homecoming_Flight_time_hour, 
+                                    'port_d':homecoming_Port_d, 
+                                    'port_a':homecoming_Port_a, 
+                                    'interior_airlines': homecoming_Interior_airlines}, index=[0])
+                    
+                    with open('last_model.pkl','rb') as pickle_file:
+                        model_departure = pickle.load(pickle_file)
+                    homecoming_pred = model_departure.predict(df_homecoming)[0]     
+                    homecoming_result = format(int(homecoming_pred), ',d')
+
+                    st.session_state['homecoming_pred'] = homecoming_pred
+                    st.session_state['df_homecoming'] = df_homecoming
+                    st.session_state['homecoming_result'] = homecoming_result
+                    st.session_state.predict_process_page = "숙박권"
+                    st.experimental_rerun()
                 
         elif predict_process_page == "숙박권":
 
-            st.write("\n숙소 가격 검색")
+            st.subheader("\n숙소 가격 검색")
+            d_date = st.session_state['d_date']
+            dclass = st.session_state['dclass']
+            departure_Flight_type = st.session_state['departure_Flight_type']
 
             col1,col2,col3,col4 = st.columns(4)
             # 입력값
@@ -295,7 +363,9 @@ def main():
                 locations = pd.read_sql_query(locations_query,conn)['location'].tolist()
                 
                 with col1:
-                    check_in_day = st.date_input('체크인 날짜를 선택하세요.')
+                    ### ===================== 수정한 부분 ===================== ###
+                    check_in_day = check_in(d_date,dclass,departure_Flight_type).date()
+                    ### ===================== 수정한 부분 ===================== ###
                 with col2:
                     location = st.selectbox('숙소 지역을 선택하세요.',locations)
                 with col3:
@@ -337,7 +407,7 @@ def main():
             
             check_in_day, location, score = get_user_input(conn)
             
-            if st.button('검색'):
+            if st.button("검색하기", key="Travel Cost Prediction accommoation search"):
                 if not check_in_day or not location:
                     st.warning('날짜와 지역을 입력해주세요.')
                 else:
@@ -345,9 +415,15 @@ def main():
                     st.table(result)
 
             st.caption('\n\nTeam I5 ')
-            if st.button("예측 결과 확인하기"):
-                st.session_state.predict_process_page = "최종결과"
-                st.experimental_rerun()
+            col1, col2, col3 = st.columns([0.28, 0.2, 0.18])
+            with col1:
+                if st.button("귀국 항공권 선택으로 돌아가기", key="Travel Cost Prediction from accommodation to return ticket"):
+                    st.session_state.predict_process_page = "귀국항공권"
+                    st.experimental_rerun()
+            with col3:
+                if st.button("최종 비용 예측하기", key="Travel Cost Prediction predict button"):
+                    st.session_state.predict_process_page = "최종결과"
+                    st.experimental_rerun()
 
         elif predict_process_page == "최종결과":
             departure_pred = st.session_state['departure_pred']
@@ -357,12 +433,22 @@ def main():
             departure_result = st.session_state['departure_result']
             homecoming_result = st.session_state['homecoming_result']
             result = format(int(departure_pred+homecoming_pred), ',d')
-
+            
             st.table(df_departure)
             st.table(df_homecoming)
             st.write(f'{departure_result}원')
             st.write(f'{homecoming_result}원')
             st.write(f'{result}원')
+            st.caption('\n\nTeam I5 ')
+            col1, col2, col3 = st.columns([0.28, 0.2, 0.20])
+            with col1:
+                if st.button("시작페이지로", key="Travel Cost Prediction from predict to start page"):
+                    st.session_state.predict_process_page = "시작페이지"
+                    st.experimental_rerun()
+            with col2:
+                if st.button("숙박권 선택으로 돌아가기", key="Travel Cost Prediction from predict to accommodation ticket"):
+                    st.session_state.predict_process_page = "숙박권"
+                    st.experimental_rerun()
 
 
 if __name__ == "__main__":

@@ -4,3 +4,4 @@ streamlit
 xgboost
 category_encoders
 scikit-learn
+sklearn
