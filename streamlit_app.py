@@ -15,8 +15,16 @@ import random
 import datetime
 from datetime import datetime, timedelta
 import sqlite3
+
 # Metabase 설정
 METABASE_URL = "https://teami5.metabaseapp.com/public/dashboard/20c55ded-717f-4edd-ad63-89af2654c8da"
+
+class SessionState:
+    def __init__(self, **kwargs):
+        self.hotel_result = pd.DataFrame()
+        self.hotel = ""
+        self.selected_hotel_price = 0
+        self.__dict__.update(kwargs)
 
 def create_connection():
     conn = None
@@ -27,7 +35,6 @@ def create_connection():
         print(e)
     return conn
 
-### ===================== 수정한 부분 시작 ===================== ###
 # check in 날짜 반환
 def check_in(d_time, travel_class, flight_type):
     check_in_hour = {
@@ -49,13 +56,19 @@ def check_in(d_time, travel_class, flight_type):
 
 # check in 날짜로 부터 ckech out 날짜 계산
 def travel_duration(check_in, h_date):
-    travel_duration = h_date - check_in
+    check_in_datetime = datetime.combine(check_in, datetime.min.time())
+    h_date_datetime = datetime.combine(h_date, datetime.min.time())
+    travel_duration = h_date_datetime - check_in_datetime
     return travel_duration.days
-### ===================== 수정한 부분 끝 ===================== ###
-
 
 
 def main():
+
+    if "state" not in st.session_state:
+        st.session_state.state = SessionState()
+
+    state = st.session_state.state
+
     # 사이드바 스타일을 적용하기 위한 CSS 스타일
     st.markdown(
         """
@@ -156,6 +169,10 @@ def main():
             font-size: 18px;
             margin-bottom: 10px;
         }
+        .hotel-info {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
         .price-result {
             font-size: 24px;
             font-weight: bold;
@@ -219,10 +236,9 @@ def main():
             departure_date = st.date_input("출발 날짜를 고르세요.")
             departure_time = st.time_input("출발 시각을 고르거나 입력하세요")
 
-            ### ===================== 수정한 부분 시작 ===================== ###
             d_date = datetime.combine(departure_date, departure_time)
             st.session_state['d_date'] = d_date
-            ### ===================== 수정한 부분 끝 ===================== ###
+
             departure = str(departure_date)+" "+str(departure_time)
             departure = pd.to_datetime(departure)
 
@@ -313,9 +329,7 @@ def main():
 
             # 귀국 날짜
             departure_date = st.session_state['departure_date']
-            ### ===================== 수정한 부분 시작 ===================== ###
             st.subheader(f"출국일 : {departure_date}")
-            ### ===================== 수정한 부분 끝 ===================== ###
             homecoming_date = st.date_input("귀국 날짜를 고르세요.")
             if departure_date == homecoming_date:
                 st.write("<span class='warning-text'>출국일과 귀국일이 동일합니다.</span>",unsafe_allow_html=True)
@@ -323,10 +337,9 @@ def main():
                 st.write("<span class='warning-text'>오류:출국일 보다 과거의 시간입니다.</span>",unsafe_allow_html=True)
             homecoming_time = st.time_input("출발 시각을 고르거나 입력하세요", key="unique_key_for_homecoming_time")
             
-            ### ===================== 수정한 부분 시작 ===================== ###
             h_date = datetime.combine(homecoming_date, homecoming_time)
             st.session_state['h_date'] = h_date
-            ### ===================== 수정한 부분 킅 ===================== ###
+
             # 국내 항공사
             dIa2 = st.selectbox("국내 항공사를 꼭 사용하겠습니까?", airlines_list, key="unique_key_for_dIa2")
             homecoming_Interior_airlines = airlines_dict[dIa2]
@@ -392,20 +405,18 @@ def main():
             col1,col2,col3,col4 = st.columns(4)
             # 입력값
             def get_user_input(conn):
-                locations_query= "SELECT DISTINCT location FROM accommodation;"
+                where = str(check_in(d_date,dclass,departure_Flight_type).date())
+                locations_query= f"SELECT DISTINCT location FROM accommodation WHERE check_in_day = '{where}';"
                 locations = pd.read_sql_query(locations_query,conn)['location'].tolist()
                 
                 with col1:
-                    ### ===================== 수정한 부분 ===================== ###
                     check_in_day = check_in(d_date,dclass,departure_Flight_type).date()
-                    ### ===================== 수정한 부분 ===================== ###
                 with col2:
                     location = st.selectbox('숙소 지역을 선택하세요.',locations)
                 with col3:
                     score = st.slider('최소 평점을 선택하세요.', 5.0, 10.0)
                 if check_in_day.year != 23 and check_in_day.month != 9:
-                    st.write(f""" 현재 체크인 날짜: {check_in_day} """)
-                    st.write("<span class='warning-text'>23년도 9월만 서비스 가능합니다. 출국 항공권 날짜를 확인해주세요.</span>",unsafe_allow_html=True)
+                    st.write("<span class='warning-text'>23년도 9월만 서비스 가능합니다. 날짜를 확인해주세요.</span>",unsafe_allow_html=True)
                 return check_in_day, location, score
 
             # 쿼리를 실행하는 함수
@@ -440,13 +451,33 @@ def main():
                 return
             
             check_in_day, location, score = get_user_input(conn)
-            
+            st.session_state['check_in_day'] = check_in_day 
             if st.button("검색하기", key="Travel Cost Prediction accommoation search"):
                 if not check_in_day or not location:
                     st.warning('날짜와 지역을 입력해주세요.')
                 else:
-                    result = run_query(conn, check_in_day, location,score)
-                    st.table(result)
+                    state.hotel_result = run_query(conn, check_in_day, location, score)
+                    if state.hotel_result.empty:
+                        st.warning("검색 결과가 없습니다.")
+                    else:
+                        st.table(state.hotel_result)
+            
+
+            result_encode = {}
+            result_copy = state.hotel_result.copy()
+            if result_copy.empty:
+                st.warning("검색 결과가 없거나 하나의 결과만 있어 호텔을 선택할 수 없습니다.")
+            else:
+                result_columns = list(result_copy.columns)
+                for i in range(len(state.hotel_result)):
+                    name = result_copy[result_columns[0]][i]
+                    price = result_copy[result_columns[1]][i]
+                    result_encode[f'{name}   1박 가격: {price}원'] = price
+
+            state.hotel = st.selectbox("호텔을 고르세요", list(result_encode.keys()), key="unique_key_for_hotel")
+            state.selected_hotel_price = result_encode.get(state.hotel, 0)
+            # st.write(f'{state.selected_hotel_price}')
+
 
             st.caption('\n\nTeam I5 ')
             col1, col2, col3 = st.columns([0.28, 0.2, 0.18])
@@ -474,18 +505,20 @@ def main():
             homecoming_result = st.session_state['homecoming_result']
             result = format(int(departure_pred+homecoming_pred), ',d')
             
-            st.header("여행 경비 예측 결과")
+            check_in_day = st.session_state['check_in_day']
+            h_date = st.session_state['h_date']
+            st.header("Travel Cost Prediction")
 
             # Custom styled result section
 
             # 출국 항공권 정보 및 예상 비용
-            st.subheader("선택하신 항공권 예상 비용은")
+            st.subheader("여행 예상 비용은")
             
             st.markdown('<div class="flight-info">', unsafe_allow_html=True)
             st.write(f"""출국 항공권\n
                         9월 {df_departure['departure_date'][0]}일 {weekday_dict[df_departure['departure_week'][0]]}요일 {df_departure['departure_time'][0]}시 출발 
-                        {airlines_dict2[df_departure['interior_airlines'][0]]} {class_dict2[df_departure['class'][0]]}좌석 {flight_type_dict2[df_departure['flight_type'][0]]} 비행시간: {df_departure['flight_time_hour'][0]}시간 
-                        출발공항:{airport_dic2[df_departure['port_d'][0]]} 도착공항:{airport_dic2[df_departure['port_a'][0]]}
+                {airlines_dict2[df_departure['interior_airlines'][0]]} {class_dict2[df_departure['class'][0]]}좌석 {flight_type_dict2[df_departure['flight_type'][0]]} 비행시간: {df_departure['flight_time_hour'][0]}시간 
+                출발공항:{airport_dic2[df_departure['port_d'][0]]} 도착공항:{airport_dic2[df_departure['port_a'][0]]}
                         """)
             st.markdown('</div>', unsafe_allow_html=True)
             st.write(f'=> <span class="price-result">{departure_result}원</span>', unsafe_allow_html=True)
@@ -494,16 +527,53 @@ def main():
             st.markdown('<div class="flight-info">', unsafe_allow_html=True)
             st.write(f"""귀국 항공권\n
                         9월 {df_homecoming['departure_date'][0]}일 {weekday_dict[df_homecoming['departure_week'][0]]}요일 {df_homecoming['departure_time'][0]}시 출발 
-                        {airlines_dict2[df_homecoming['interior_airlines'][0]]} {class_dict2[df_homecoming['class'][0]]}좌석 {flight_type_dict2[df_homecoming['flight_type'][0]]} 비행시간: {df_homecoming['flight_time_hour'][0]}시간 
-                        출발공항:{airport_dic2[df_homecoming['port_d'][0]]} 도착공항:{airport_dic2[df_homecoming['port_a'][0]]}
+                {airlines_dict2[df_homecoming['interior_airlines'][0]]} {class_dict2[df_homecoming['class'][0]]}좌석 {flight_type_dict2[df_homecoming['flight_type'][0]]} 비행시간: {df_homecoming['flight_time_hour'][0]}시간 
+                출발공항:{airport_dic2[df_homecoming['port_d'][0]]} 도착공항:{airport_dic2[df_homecoming['port_a'][0]]}
                         """)
             st.markdown('</div>', unsafe_allow_html=True)
             st.write(f'=> <span class="price-result">{homecoming_result}원</span>', unsafe_allow_html=True)
 
-            # Close the styled result section
-            st.markdown('</div>', unsafe_allow_html=True)
 
-            st.write(f'<div class="stylish-text">총 {result}원 입니다.</div>',unsafe_allow_html=True)
+
+            try:
+                if (check_in_day.month > h_date.month):
+                    e = Exception()
+                    raise e
+                elif (check_in_day.day > h_date.day):
+                    e = Exception()
+                    raise e
+                elif (check_in_day.month!=9) or (h_date.month!=9):
+                    e = Exception()
+                    raise e
+                else:
+                    pass
+                
+                hotel_price_result = format(int(state.selected_hotel_price), ',d')
+                Travel_duration_day = travel_duration(check_in_day, h_date)
+                total_hotel_price = int(hotel_price_result.replace(',', '')) * (Travel_duration_day - 1)
+                total_travel_price = int(hotel_price_result.replace(',', '')) * (Travel_duration_day - 1) + int(departure_pred+homecoming_pred)
+
+                # 숙박권 비용
+                st.markdown('<div class="hotel-info">', unsafe_allow_html=True)
+                st.write(f"""숙박권\n
+                            {check_in_day.month}월 {check_in_day.day}일 {weekday_dict[check_in_day.weekday()]}요일 체크인 {h_date.month}월 {h_date.day}일 {weekday_dict[h_date.weekday()]}요일 체크아웃 총 {Travel_duration_day}박
+                {state.hotel} 
+                            """)
+                st.markdown('</div>', unsafe_allow_html=True)
+                st.write(f'1박당 가격: {hotel_price_result}원', unsafe_allow_html=True)
+                st.write(f'=> <span class="price-result">{total_hotel_price:,d}원</span>', unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+
+                st.write(f'<div class="stylish-text">총 {total_travel_price} 원입니다.</div>',unsafe_allow_html=True)
+            except:
+                print('w')
+                st.markdown('<div class="hotel-info">', unsafe_allow_html=True)
+                st.write(f"""숙박권\n
+                            올바른 숙박권이 아닙니다. 체크인 날짜와 체크아웃 날짜를 확인해주세요.
+                            {check_in_day.month}월 {check_in_day.day}일 {weekday_dict[check_in_day.weekday()]}요일 체크인 {h_date.month}월 {h_date.day}일 {weekday_dict[h_date.weekday()]}요일 체크아웃
+                            """, unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+                st.write(f'<div class="stylish-text">총 {result} 원입니다.</div>',unsafe_allow_html=True)
 
 
             st.caption('\n\nTeam I5 ')
